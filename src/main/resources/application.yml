@@ -1,0 +1,6 @@
+bootstrap-servers: ${KAFKA_BROKER_URLS:127.0.0.1:9092}
+
+logging:
+  level:
+    root: INFO
+
