@@ -1,11 +1,13 @@
-package org.gpk.kafkaexamples.windows;
+package org.gpk.kafkaexamples.window;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
+import org.apache.kafka.streams.kstream.Suppressed;
 import org.apache.kafka.streams.kstream.TimeWindows;
+import org.apache.kafka.streams.kstream.Windowed;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -48,6 +50,29 @@ public class TimeWindowsTest {
         streamsBuilder.<String, String>stream("input")
                 .groupByKey()
                 .reduce((v1, v2) -> v2)
+                .toStream()
+                .foreach((k, v) -> log.info("key : {}, value : {}", k, v));
+
+        new KafkaStreams(streamsBuilder.build(), props).start();
+        Thread.sleep(Long.MAX_VALUE);
+    }
+
+    /* wait for new messages for a period of time before before emitting it downstream */
+    @Test
+    public void suppressed() throws InterruptedException {
+        StreamsBuilder streamsBuilder = new StreamsBuilder();
+        Properties props = properties();
+
+        props.put(StreamsConfig.APPLICATION_ID_CONFIG, "suppressed-test");
+        props.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, 2000);
+
+        streamsBuilder.<String, String>stream("input")
+                .groupByKey()
+                .windowedBy(TimeWindows.of(Duration.ofMillis(5000)))
+                // .aggregate(String::new, (k, v, va) -> v)
+                .<Windowed<String>, String>reduce((v1, v2) -> v2)
+                // .suppress(Suppressed.untilTimeLimit(Duration.ofMillis(1000), Suppressed.BufferConfig.unbounded()))
+                .suppress(Suppressed.untilWindowCloses(Suppressed.BufferConfig.unbounded()))
                 .toStream()
                 .foreach((k, v) -> log.info("key : {}, value : {}", k, v));
 

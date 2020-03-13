@@ -38,16 +38,6 @@ public class ProcessorApiTest {
                 .addProcessor("Processor1", () -> new Processor1(), "Source")
                 .addStateStore(Stores.keyValueStoreBuilder(Stores.inMemoryKeyValueStore("store1"), Serdes.String(), Serdes.String()), "Processor1");
 
-                /*
-                .addProcessor("Processor2", new ProcessorSupplier<String, String>() {            //include second custom processor
-                    public Processor<String, String> get() {
-                        return new Processor2();
-                    }
-                }, "Processor1")
-                 */
-        // .addSink("Sink", "Output-Topic", "Processor2")                        //link store Count to first processor
-        // .connectProcessorAndStateStores("Processor2", "Count");              //define the output topic
-
         KafkaStreams streams = new <String, String>KafkaStreams(builder, props);
         streams.start();
 

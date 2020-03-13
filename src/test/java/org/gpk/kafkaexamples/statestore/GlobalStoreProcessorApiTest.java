@@ -22,6 +22,10 @@ import java.util.Properties;
 @ActiveProfiles("test")
 public class GlobalStoreProcessorApiTest {
 
+    /**
+     * throws a runtime exception on new message produced to global store topic,
+     * global store processor can not call forward()
+     */
     @Test
     public void start() throws InterruptedException {
 
@@ -35,20 +39,24 @@ public class GlobalStoreProcessorApiTest {
         props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
 
+        props.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, 1000);
+
         builder
                 .addSource("source", "input")                    //define source topic
                 .addProcessor("processor1", Processor1::new, "source")
                 .addGlobalStore(
                         Stores.keyValueStoreBuilder(
                             Stores.inMemoryKeyValueStore("globalStore1"),
-                            Serdes.String(), Serdes.String()).withLoggingDisabled(),
+                            Serdes.String(), Serdes.String())
+                            .withLoggingDisabled(), // logging must be disabled for global stores
                        "globalStoreSource",
                             new StringDeserializer(),
                             new StringDeserializer(),
                        "globalStoreTopic",
                        "GlobalStoreProcessor1", GlobalStoreProcessor1::new
                         )
-                .addSink("sink", "globalStoreTopic", "processor1");
+                .addSink("sink", "globalStoreTopic", "processor1")
+                .addSink("fromGlobalStore", "fromGlobalStoreTopic", "GlobalStoreProcessor1");
 
         KafkaStreams streams = new <String, String>KafkaStreams(builder, props);
         streams.start();
@@ -56,15 +64,19 @@ public class GlobalStoreProcessorApiTest {
         Thread.sleep(Long.MAX_VALUE);
     }
 
-    static class GlobalStoreProcessor1 implements Processor<Object, Object> {
-                @Override
-                public void init(ProcessorContext context) { }
-                @Override
-                public void close() { }
-                @Override
-                public void process(Object key, Object value) {
-                    log.info("global store - new message - key : {}, value : {}", key, value);
-                }
+    static class GlobalStoreProcessor1 implements Processor<String, String> {
+        private ProcessorContext context;
+        @Override
+        public void init(ProcessorContext context) {
+            this.context = context;
+        }
+        @Override
+        public void close() { }
+        @Override
+        public void process(String key, String value) {
+            log.info("global store - new message - key : {}, value : {}", key, value);
+            context.forward(key, value);
+        }
     }
 
 
